@@ -13,13 +13,13 @@
  * limitations under the License.
  */
 
+import * as stats from './stats.js';
 import type {
-	ITrialResult,
 	IFunctionStatistics,
 	IPairedComparison,
 	ISuiteReport,
+	ITrialResult,
 } from './types.js';
-import * as stats from './stats.js';
 
 // ── Baseline extraction ─────────────────────────────────────────────────
 

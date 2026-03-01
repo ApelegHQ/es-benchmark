@@ -36,12 +36,13 @@ function shuffled<T>(array: readonly T[]): T[] {
 }
 
 /** Invoke an optional sync-or-async callback with a `this` context. */
-async function invoke<T extends object>(
-	fn: ((this: T) => unknown | PromiseLike<unknown>) | undefined,
-	ctx: T,
+async function invoke<TC extends object, TA extends unknown[] = never[]>(
+	fn: ((this: TC, ...args: TA) => unknown | PromiseLike<unknown>) | undefined,
+	ctx: TC,
+	...args: TA
 ): Promise<void> {
 	if (!fn) return;
-	const result = fn.call(ctx);
+	const result = fn.apply(ctx, args);
 	if (
 		result &&
 		typeof result === 'object' &&
@@ -123,17 +124,19 @@ export class Suite<TC extends object = Record<string, unknown>, TR = unknown> {
 	private readonly _warmup: number;
 	private readonly _iterations: number;
 	private readonly _trials: number;
-	private readonly _suiteSetup?: ISuiteConfig<TC>['setup'];
-	private readonly _suiteTeardown?: ISuiteConfig<TC>['teardown'];
+	private readonly _suiteSetup?: ISuiteConfig<TC, TR>['setup'];
+	private readonly _suiteTeardown?: ISuiteConfig<TC, TR>['teardown'];
+	private readonly _suiteValidate?: ISuiteConfig<TC, TR>['validate'];
 	private readonly _fns: IBenchmarkFn<TC, TR>[] = [];
 
-	constructor(options: ISuiteConfig<TC>) {
+	constructor(options: ISuiteConfig<TC, TR>) {
 		this._name = options.name;
 		this._warmup = options.warmupIterations ?? 10;
 		this._iterations = options.iterationsPerTrial ?? 1000;
 		this._trials = options.trials ?? 30;
 		this._suiteSetup = options.setup;
 		this._suiteTeardown = options.teardown;
+		this._suiteValidate = options.validate;
 	}
 
 	/** Register a benchmark function.  Returns `this` for chaining. */
@@ -173,8 +176,24 @@ export class Suite<TC extends object = Record<string, unknown>, TR = unknown> {
 			const measurements: Record<string, ITrialMeasurement> = {};
 
 			for (const bench of order) {
-				const ctx = {} as TC;
+				if (
+					bench.name !== NULL_FUNCTION_NAME &&
+					(this._suiteValidate || bench.setup)
+				) {
+					const validateCtx = {} as TC;
+					await invoke(
+						this._suiteValidate,
+						validateCtx,
+						bench.fn as IBenchmarkFn<TC, TR>['fn'],
+					);
+					await invoke(
+						bench.validate,
+						validateCtx,
+						bench.fn as IBenchmarkFn<TC, TR>['fn'],
+					);
+				}
 
+				const ctx = {} as TC;
 				await invoke(this._suiteSetup, ctx);
 				await invoke(bench.setup, ctx);
 
@@ -220,8 +239,11 @@ export class Suite<TC extends object = Record<string, unknown>, TR = unknown> {
  * One-shot functional API — builds a {@link Suite}, adds every function,
  * and runs immediately.
  */
-export async function runSuite<TC extends object = Record<string, unknown>, TR = unknown>(
-	config: ISuiteConfig<TC> & { functions: IBenchmarkFn<TC, TR>[] },
+export async function runSuite<
+	TC extends object = Record<string, unknown>,
+	TR = unknown,
+>(
+	config: ISuiteConfig<TC, TR> & { functions: IBenchmarkFn<TC, TR>[] },
 ): Promise<ISuiteReport> {
 	const { functions, ...suiteConfig } = config;
 	const suite = new Suite<TC, TR>(suiteConfig);

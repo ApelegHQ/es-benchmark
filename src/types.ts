@@ -16,7 +16,11 @@
 /**
  * A callback that receives benchmark context via `this`.
  */
-export type ContextFn<TC extends object, TR = unknown> = (this: TC) => TR | PromiseLike<TR>;
+export type ContextFn<
+	TC extends object,
+	TR = unknown,
+	TA extends unknown[] = never[],
+> = (this: TC, ...args: TA) => TR | PromiseLike<TR>;
 
 /**
  * Reserved name for the automatically-injected no-op baseline function.
@@ -28,7 +32,10 @@ export const NULL_FUNCTION_NAME = '@@null';
 /**
  * A single benchmark function to be measured within a suite.
  */
-export interface IBenchmarkFn<TC extends object = Record<string, unknown>, TR = unknown> {
+export interface IBenchmarkFn<
+	TC extends object = Record<string, unknown>,
+	TR = unknown,
+> {
 	/** Display name for this benchmark. Must be unique within its suite. */
 	name: string;
 	/** The function to benchmark. Receives shared context via `this`. */
@@ -37,12 +44,18 @@ export interface IBenchmarkFn<TC extends object = Record<string, unknown>, TR = 
 	setup?: ContextFn<TC, void>;
 	/** Runs after measurement each trial (before suite teardown). */
 	teardown?: ContextFn<TC, void>;
+	/** Runs before setup + warmup + measurement each trial
+	 *  (after suite validate). */
+	validate?: ContextFn<TC, void, [ContextFn<TC, TR>]>;
 }
 
 /**
  * Configuration for a benchmark suite.
  */
-export interface ISuiteConfig<TC extends object = Record<string, unknown>> {
+export interface ISuiteConfig<
+	TC extends object = Record<string, unknown>,
+	TR = unknown,
+> {
 	/** Display name for the suite. */
 	name: string;
 	/** Warmup iterations before each measurement (default: 10). */
@@ -61,6 +74,11 @@ export interface ISuiteConfig<TC extends object = Record<string, unknown>> {
 	 * function-level teardown.
 	 */
 	teardown?: ContextFn<TC, void>;
+	/**
+	 * Suite-level validate — runs once per function per trial before any
+	 * other callbacks (like setup). The context is discarded after execution.
+	 */
+	validate?: ContextFn<TC, void, [ContextFn<TC, TR>]>;
 }
 
 // ── Raw trial data ──────────────────────────────────────────────────────

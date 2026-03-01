@@ -14,12 +14,12 @@
  */
 
 import pc from 'picocolors';
+import { mean, stdDev } from '../stats.js';
 import type {
-	ISuiteReport,
 	IFunctionStatistics,
 	IPairedComparison,
+	ISuiteReport,
 } from '../types.js';
-import { mean, stdDev } from '../stats.js';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  Constants
@@ -64,6 +64,8 @@ function ft(ms: number): string {
 	const a = Math.abs(ms);
 	const sign = ms < 0 ? '−' : '';
 	if (a === 0) return '0.00 ns';
+	if (a < 0.000_000_000_001) return `${sign}${(a * 1e15).toFixed(3)} as`;
+	if (a < 0.000_000_001) return `${sign}${(a * 1e12).toFixed(3)} fs`;
 	if (a < 0.000_001) return `${sign}${(a * 1e9).toFixed(3)} ps`;
 	if (a < 0.001) return `${sign}${(a * 1e6).toFixed(2)} ns`;
 	if (a < 1) return `${sign}${(a * 1e3).toFixed(2)} µs`;
@@ -75,7 +77,10 @@ function ft(ms: number): string {
 function fops(ms: number): string {
 	if (ms <= 0) return '∞ op/s';
 	const ops = 1000 / ms;
-	if (ops >= 1e9) return `${(ops / 1e9).toFixed(2)}B op/s`;
+	if (ops >= 1e18) return `${(ops / 1e18).toFixed(2)}E op/s`;
+	if (ops >= 1e15) return `${(ops / 1e15).toFixed(2)}P op/s`;
+	if (ops >= 1e12) return `${(ops / 1e12).toFixed(2)}T op/s`;
+	if (ops >= 1e9) return `${(ops / 1e9).toFixed(2)}G op/s`;
 	if (ops >= 1e6) return `${(ops / 1e6).toFixed(2)}M op/s`;
 	if (ops >= 1e3) return `${(ops / 1e3).toFixed(2)}K op/s`;
 	return `${ops.toFixed(2)} op/s`;
@@ -101,18 +106,18 @@ function fpv(p: number): string {
 	return `p = ${p.toFixed(4)}`;
 }
 
-/** Significance stars: `***`, `**`, `*`, or `ns`. */
-function sig(p: number): string {
+/** Significance stars: `***`, `**`, `*`, or `n.s.`. */
+function sig(p: number): '***' | '**' | '*' | 'n.s.' {
 	if (p < 0.001) return '***';
 	if (p < 0.01) return '**';
 	if (p < 0.05) return '*';
-	return 'ns';
+	return 'n.s.';
 }
 
 /** Colored significance stars. */
 function csig(p: number): string {
 	const s = sig(p);
-	return s === 'ns' ? pc.dim(s) : pc.yellow(s);
+	return s === 'n.s.' ? pc.dim(s) : pc.yellow(s);
 }
 
 /** Coefficient of variation as a percentage. */

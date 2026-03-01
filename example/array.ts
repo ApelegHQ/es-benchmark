@@ -13,9 +13,10 @@
  * limitations under the License.
  */
 
+import { deepEqual, notEqual } from 'node:assert/strict';
 import { runSuite } from '../src/index.js';
-import simpleReport from '../src/reporters/simple.js';
 import advancedReport from '../src/reporters/advanced.js';
+import simpleReport from '../src/reporters/simple.js';
 
 type Ctx = {
 	array: unknown[];
@@ -25,6 +26,12 @@ const result = await runSuite<Ctx, Ctx['array']>({
 	name: 'Array shallow copying',
 	setup() {
 		this.array = [1, 2, 3];
+	},
+	validate(fn) {
+		this.array = [6, 7, 8];
+		const result = fn.call(this);
+		notEqual(result, this.array);
+		deepEqual(result, this.array);
 	},
 	functions: [
 		{
@@ -53,7 +60,7 @@ const result = await runSuite<Ctx, Ctx['array']>({
 				for (let i = 0; i < len; i++) copy[i] = this.array[i];
 
 				return copy;
-			}
+			},
 		},
 	],
 });

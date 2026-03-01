@@ -14,9 +14,9 @@
  */
 
 import type {
-	ISuiteReport,
 	IFunctionStatistics,
 	IPairedComparison,
+	ISuiteReport,
 } from '../types.js';
 
 const escapeXml = (s: string) => {

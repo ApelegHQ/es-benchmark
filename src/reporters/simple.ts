@@ -315,7 +315,7 @@ function emitBaseline(
 /*  Formatting utilities                                               */
 /* ================================================================== */
 
-type Unit = 'ns' | 'µs' | 'ms' | 's';
+type Unit = 'as' | 'fs' | 'ps' | 'ns' | 'µs' | 'ms' | 's';
 
 /** Choose a display unit based on absolute magnitude (in ms). */
 function pickUnit(ms: number): Unit {
@@ -324,7 +324,10 @@ function pickUnit(ms: number): Unit {
 	if (a >= 1_000) return 's';
 	if (a >= 1) return 'ms';
 	if (a >= 0.001) return 'µs';
-	return 'ns';
+	if (a >= 0.000_001) return 'ns';
+	if (a >= 0.000_000_001) return 'ps';
+	if (a >= 0.000_000_000_001) return 'fs';
+	return 'as';
 }
 
 /** Convert milliseconds → target display unit. */
@@ -338,6 +341,12 @@ function toUnit(ms: number, u: Unit): number {
 			return ms * 1_000;
 		case 'ns':
 			return ms * 1_000_000;
+		case 'ps':
+			return ms * 1_000_000_000;
+		case 'fs':
+			return ms * 1_000_000_000_000;
+		case 'as':
+			return ms * 1_000_000_000_000_000;
 	}
 }
 
