@@ -64,7 +64,6 @@ export function randIntInRange(min: number, max: number): number {
 		const val = Math.floor(Math.random() * 0x20000000000000); // 2^53
 		const limit = Math.floor(0x20000000000000 / range) * range;
 		if (val < limit) {
-			console.error(min + (range - (val % range)), { min, range, val });
 			return min + (range - 1 - (val % range));
 		}
 	}
