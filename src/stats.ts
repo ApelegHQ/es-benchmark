@@ -15,12 +15,12 @@
 
 // ── Descriptive statistics ──────────────────────────────────────────────
 
-export function mean(values: number[]): number {
+export function mean(values: readonly number[]): number {
 	if (values.length === 0) return NaN;
 	return values.reduce((s, v) => s + v, 0) / values.length;
 }
 
-export function median(values: number[]): number {
+export function median(values: readonly number[]): number {
 	if (values.length === 0) return NaN;
 	const sorted = [...values].sort((a, b) => a - b);
 	const mid = Math.floor(sorted.length / 2);
@@ -30,29 +30,29 @@ export function median(values: number[]): number {
 }
 
 /** Sample variance (Bessel-corrected, $n - 1$ denominator). */
-export function variance(values: number[]): number {
+export function variance(values: readonly number[]): number {
 	if (values.length < 2) return NaN;
 	const avg = mean(values);
 	return values.reduce((s, v) => s + (v - avg) ** 2, 0) / (values.length - 1);
 }
 
 /** Sample standard deviation ($\sqrt{\text{variance}}$). */
-export function stdDev(values: number[]): number {
+export function stdDev(values: readonly number[]): number {
 	return Math.sqrt(variance(values));
 }
 
 /** Standard error of the mean: $s / \sqrt{n}$. */
-export function sem(values: number[]): number {
+export function sem(values: readonly number[]): number {
 	if (values.length < 2) return NaN;
 	return stdDev(values) / Math.sqrt(values.length);
 }
 
-export function min(values: number[]): number {
+export function min(values: readonly number[]): number {
 	if (values.length === 0) return NaN;
 	return values.reduce((a, b) => Math.min(a, b), Infinity);
 }
 
-export function max(values: number[]): number {
+export function max(values: readonly number[]): number {
 	if (values.length === 0) return NaN;
 	return values.reduce((a, b) => Math.max(a, b), -Infinity);
 }

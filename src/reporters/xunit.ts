@@ -34,7 +34,7 @@ const escapeXml = (s: string) => {
 };
 
 const safeXml = (
-	template: TemplateStringsArray,
+	template: Readonly<TemplateStringsArray>,
 	...substitutions: unknown[]
 ): string => {
 	const escapedSubstitutions = substitutions.map((substitution) =>
@@ -71,7 +71,7 @@ const sign = (n: number): string => (n >= 0 ? '+' : '');
 
 // ── <system-out> plain-text summaries ───────────────────────────────────
 
-function fnSummaryText(f: IFunctionStatistics): string {
+function fnSummaryText(f: Readonly<IFunctionStatistics>): string {
 	return [
 		safeXml`Benchmark: ${f.name}`,
 		safeXml``,
@@ -88,7 +88,7 @@ function fnSummaryText(f: IFunctionStatistics): string {
 	].join('\n');
 }
 
-function cmpSummaryText(c: IPairedComparison): string {
+function cmpSummaryText(c: Readonly<IPairedComparison>): string {
 	const dir =
 		c.meanDifference > 0
 			? 'slower than'
@@ -125,7 +125,7 @@ function cmpSummaryText(c: IPairedComparison): string {
  */
 function buildFnCase(
 	suite: string,
-	f: IFunctionStatistics,
+	f: Readonly<IFunctionStatistics>,
 	wallClockMs: number,
 ): string {
 	return [
@@ -166,7 +166,7 @@ function buildFnCase(
  *
  * All t-test fields land in `vendor:benchmark.*` with full precision.
  */
-function buildCmpCase(suite: string, c: IPairedComparison): string {
+function buildCmpCase(suite: string, c: Readonly<IPairedComparison>): string {
 	return [
 		safeXml`    <testcase name="${c.a + ' vs ' + c.b}" classname="${suite + '.comparisons'}" time="0">`,
 		safeXml`      <properties>`,
@@ -214,7 +214,7 @@ function buildCmpCase(suite: string, c: IPairedComparison): string {
  * `vendor:benchmark.*` `<property>` elements with full JS numeric
  * precision (lossless IEEE-754 round-trip via default `toString`).
  */
-function formatJUnitXml(report: ISuiteReport): string {
+function formatJUnitXml(report: Readonly<ISuiteReport>): string {
 	const timestamp = new Date().toISOString();
 
 	// ── Pre-compute per-function wall-clock totals from trial data ──

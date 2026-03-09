@@ -231,7 +231,7 @@ describe('Suite', () => {
 
 			await new Suite<{ v: number }>({
 				name: 'lifecycle',
-				trials: 1,
+				trials: 2,
 				warmupIterations: 0,
 				iterationsPerTrial: 1,
 				setup() {
@@ -265,14 +265,21 @@ describe('Suite', () => {
 
 			// identity shuffle → null first, then fn
 			assert.deepEqual(log, [
-				'suite-setup',
+				'suite-validate', // fn
+				'fn-validate', // fn
+				'suite-setup', // @@null
 				'suite-teardown', // @@null
-				'suite-validate',
-				'fn-validate',
-				'suite-setup',
-				'fn-setup',
-				'fn-run',
-				'fn-teardown',
+				'suite-setup', // fn
+				'fn-setup', // fn
+				'fn-run', // fn
+				'fn-teardown', // fn
+				'suite-teardown', // fn
+				'suite-setup', // @@null
+				'suite-teardown', // @@null
+				'suite-setup', // fn
+				'fn-setup', // fn
+				'fn-run', // fn
+				'fn-teardown', // fn
 				'suite-teardown', // fn
 			]);
 		});

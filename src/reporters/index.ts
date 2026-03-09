@@ -15,3 +15,4 @@
 
 export { default as advanced } from './advanced.js';
 export { default as simple } from './simple.js';
+export { default as xunit } from './xunit.js';

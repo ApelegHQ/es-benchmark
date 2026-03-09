@@ -29,7 +29,7 @@ import type {
  */
 function getBaselineSamples(
 	baselineName: string,
-	trials: ITrialResult[],
+	trials: readonly Readonly<ITrialResult>[],
 ): number[] {
 	return trials.map((t) => t.measurements[baselineName].perIterationMs);
 }
@@ -38,8 +38,8 @@ function getBaselineSamples(
 
 function computeFunctionStats(
 	name: string,
-	trials: ITrialResult[],
-	baselineSamples: number[],
+	trials: readonly Readonly<ITrialResult>[],
+	baselineSamples: readonly number[],
 ): IFunctionStatistics {
 	const rawSamples = trials.map((t) => t.measurements[name].perIterationMs);
 	// Subtract the null-function time measured in the *same* trial
@@ -74,8 +74,8 @@ function computeFunctionStats(
 function computePairedComparison(
 	nameA: string,
 	nameB: string,
-	trials: ITrialResult[],
-	baselineSamples: number[],
+	trials: readonly Readonly<ITrialResult>[],
+	baselineSamples: readonly number[],
 ): IPairedComparison {
 	// Use baseline-corrected values so that relativeDifference reflects
 	// actual computation time, not measurement overhead.
@@ -121,7 +121,7 @@ export function generateReport(
 	name: string,
 	config: ISuiteReport['config'],
 	trials: ITrialResult[],
-	functionNames: string[],
+	functionNames: readonly string[],
 	baselineName: string,
 ): ISuiteReport {
 	const baselineSamples = getBaselineSamples(baselineName, trials);

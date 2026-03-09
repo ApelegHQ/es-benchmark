@@ -58,7 +58,10 @@ export interface IReporterOptions {
  * - A bar chart and paired-comparison table are shown when there
  *   are two or more user functions.
  */
-function report(suite: ISuiteReport, opts?: IReporterOptions): void {
+function report(
+	suite: Readonly<ISuiteReport>,
+	opts?: Readonly<IReporterOptions>,
+): void {
 	const out =
 		opts?.output ??
 		(console.log as Exclude<IReporterOptions['output'], undefined>);
@@ -145,7 +148,10 @@ function report(suite: ISuiteReport, opts?: IReporterOptions): void {
 /*  Section renderers                                                  */
 /* ================================================================== */
 
-function emitHeader(ln: (s?: string) => void, suite: ISuiteReport): void {
+function emitHeader(
+	ln: (s?: string) => void,
+	suite: Readonly<ISuiteReport>,
+): void {
 	const { config: c } = suite;
 	ln(`  ${pc.bold(pc.cyan(suite.name))}`);
 	ln(
@@ -162,9 +168,9 @@ function emitHeader(ln: (s?: string) => void, suite: ISuiteReport): void {
 
 function emitTable(
 	ln: (s?: string) => void,
-	fns: IFunctionStatistics[],
-	fastest: IFunctionStatistics,
-	unit: Unit,
+	fns: readonly Readonly<IFunctionStatistics>[],
+	fastest: Readonly<IFunctionStatistics>,
+	unit: Readonly<Unit>,
 	showRel: boolean,
 ): void {
 	const nameW = Math.max(...fns.map((f) => f.name.length));
@@ -213,9 +219,9 @@ function emitTable(
 
 function emitChart(
 	ln: (s?: string) => void,
-	fns: IFunctionStatistics[],
-	fastest: IFunctionStatistics,
-	unit: Unit,
+	fns: readonly Readonly<IFunctionStatistics>[],
+	fastest: Readonly<IFunctionStatistics>,
+	unit: Readonly<Unit>,
 	W: number,
 ): void {
 	const nameW = Math.max(...fns.map((f) => f.name.length));
@@ -245,9 +251,9 @@ function emitChart(
 
 function emitComparisons(
 	ln: (s?: string) => void,
-	comps: IPairedComparison[],
-	fastest: IFunctionStatistics,
-	unit: Unit,
+	comps: readonly Readonly<IPairedComparison>[],
+	fastest: Readonly<IFunctionStatistics>,
+	unit: Readonly<Unit>,
 	W: number,
 ): void {
 	ln(`  ${pc.bold('Comparisons')} ${pc.dim('(paired t-test, α = 0.05)')}`);
@@ -296,8 +302,8 @@ function emitComparisons(
 
 function emitBaseline(
 	ln: (s?: string) => void,
-	baseline: IFunctionStatistics,
-	unit: Unit,
+	baseline: Readonly<IFunctionStatistics>,
+	unit: Readonly<Unit>,
 ): void {
 	const raw = baseline.rawSamples;
 	const avg = mean(raw);

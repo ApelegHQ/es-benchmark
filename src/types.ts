@@ -22,6 +22,25 @@ export type ContextFn<
 	TA extends unknown[] = never[],
 > = (this: TC, ...args: TA) => TR | PromiseLike<TR>;
 
+type BenchmarkFn<TC extends object, TA extends unknown[], TR> = ContextFn<
+	TC,
+	TR,
+	TA
+>;
+
+type VoidFn<TC extends object, TA extends unknown[]> = ContextFn<TC, void, TA>;
+
+type ValidateArgs<TC extends object, TA extends unknown[], TR = unknown> = [
+	fn: BenchmarkFn<TC, TA, TR>,
+	...args: TA,
+];
+
+type ValidateFn<
+	TC extends object,
+	TA extends unknown[],
+	TR = unknown,
+> = ContextFn<TC, void, ValidateArgs<TC, TA, TR>>;
+
 /**
  * Reserved name for the automatically-injected no-op baseline function.
  * Its measurement captures pure loop + call overhead, which is subtracted
@@ -41,18 +60,21 @@ export interface IRunProgress {
 export interface IBenchmarkFn<
 	TC extends object = Record<string, unknown>,
 	TR = unknown,
+	TA extends unknown[] = never[],
 > {
 	/** Display name for this benchmark. Must be unique within its suite. */
 	name: string;
 	/** The function to benchmark. Receives shared context via `this`. */
-	fn: ContextFn<TC, TR>;
+	fn: BenchmarkFn<TC, TA, TR>;
 	/** Runs before warmup + measurement each trial (after suite setup). */
-	setup?: ContextFn<TC, void>;
+	setup?: VoidFn<TC, TA>;
 	/** Runs after measurement each trial (before suite teardown). */
-	teardown?: ContextFn<TC, void>;
-	/** Runs before setup + warmup + measurement each trial
-	 *  (after suite validate). */
-	validate?: ContextFn<TC, void, [ContextFn<TC, TR>]>;
+	teardown?: VoidFn<TC, TA>;
+	/**
+	 * Runs once before any trials, after suite validate. Shares context
+	 * with suite-level validate.
+	 */
+	validate?: ValidateFn<TC, TA, TR>;
 }
 
 /**
@@ -61,6 +83,7 @@ export interface IBenchmarkFn<
 export interface ISuiteConfig<
 	TC extends object = Record<string, unknown>,
 	TR = unknown,
+	TA extends unknown[] = never[],
 > {
 	/** Display name for the suite. */
 	name: string;
@@ -70,22 +93,35 @@ export interface ISuiteConfig<
 	iterationsPerTrial?: number;
 	/** Number of independent trials to run (default: 30). */
 	trials?: number;
+	/** Arguments to pass suite functions. Useful for dependencies */
+	args?: never[] extends TA ? TA | undefined : TA;
 	/**
 	 * Suite-level setup — runs once per function per trial to populate a
 	 * fresh context object before the function-level setup.
 	 */
-	setup?: ContextFn<TC, void>;
+	setup?: VoidFn<TC, TA>;
 	/**
 	 * Suite-level teardown — runs once per function per trial after the
 	 * function-level teardown.
 	 */
-	teardown?: ContextFn<TC, void>;
+	teardown?: VoidFn<TC, TA>;
 	/**
-	 * Suite-level validate — runs once per function per trial before any
-	 * other callbacks (like setup). The context is discarded after execution.
+	 * Suite-level validate — runs once per function before any trials, and
+	 * before function validate.
+	 * The context is discarded after execution of this function and the
+	 * function-level validate.
 	 */
-	validate?: ContextFn<TC, void, [ContextFn<TC, TR>]>;
+	validate?: ValidateFn<TC, TA, TR>;
 }
+
+export type SuiteConfig<
+	TC extends object,
+	TR = unknown,
+	TA extends unknown[] = never[],
+> = Omit<ISuiteConfig<TC, TR, TA>, 'args'> &
+	(never[] extends TA
+		? Partial<Pick<ISuiteConfig<TC, TR, TA>, 'args'>>
+		: Required<Pick<ISuiteConfig<TC, TR, TA>, 'args'>>);
 
 // ── Raw trial data ──────────────────────────────────────────────────────
 

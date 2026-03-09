@@ -13,31 +13,35 @@
  * limitations under the License.
  */
 
-// Runner
-export { runSuite, Suite } from './runner.js';
+import { deepEqual, notEqual } from 'node:assert/strict';
+import { runSuite } from '../src/index.js';
 
-// Report generation (useful for re-processing serialised trial data)
-export { generateReport } from './report.js';
+type Ctx = {
+	array: unknown[];
+};
 
-// Stats utilities (for custom consumer-side analysis)
-export * as stats from './stats.js';
+const result = await runSuite<Ctx, Ctx['array'], [dep1: number, dep2: string]>({
+	name: 'Array shallow copying',
+	args: [1, 'a'],
+	setup() {
+		this.array = [1, 2, 3];
+	},
+	validate(fn) {
+		this.array = [6, 7, 8];
+		const result = fn.call(this, 1, 'a');
+		notEqual(result, this.array);
+		deepEqual(result, this.array);
+	},
+	functions: [
+		{
+			name: 'Array.from',
+			fn(dep1, dep2) {
+				dep1.toExponential(1);
+				dep2.toLowerCase();
+				return Array.from(this.array);
+			},
+		},
+	],
+});
 
-// Error types
-export * from './errors.js';
-
-// Types
-export { NULL_FUNCTION_NAME } from './types.js';
-export type {
-	ContextFn,
-	IBenchmarkFn,
-	IFunctionStatistics,
-	IPairedComparison,
-	IRunProgress,
-	ISuiteConfig,
-	ISuiteReport,
-	ITrialMeasurement,
-	ITrialResult,
-	SuiteConfig,
-} from './types.js';
-
-export * from './reporters/index.js';
+console.log(result);

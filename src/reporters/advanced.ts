@@ -121,7 +121,7 @@ function csig(p: number): string {
 }
 
 /** Coefficient of variation as a percentage. */
-function cvPct(f: IFunctionStatistics): number {
+function cvPct(f: Readonly<IFunctionStatistics>): number {
 	return f.mean > 0 ? (f.stdDev / f.mean) * 100 : 0;
 }
 
@@ -157,7 +157,7 @@ function tpBar(ratio: number, w: number, rank: number): string {
  * Mini sparkline histogram of the sample distribution.
  * Bins are rendered with Unicode block elements ▁–█.
  */
-function sparkline(samples: number[], w: number = 18): string {
+function sparkline(samples: readonly number[], w: number = 18): string {
 	if (samples.length < 2) return '';
 	const sorted = [...samples].sort((a, b) => a - b);
 	const min = sorted[0];
@@ -193,7 +193,7 @@ function sparkline(samples: number[], w: number = 18): string {
  * - Median: bold white `│`
  */
 function miniBox(
-	f: IFunctionStatistics,
+	f: Readonly<IFunctionStatistics>,
 	lo: number,
 	hi: number,
 	w: number = 32,
@@ -255,7 +255,7 @@ function secLine(label: string, totalW: number = 76): string {
 //  Sections
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function renderHeader(suite: ISuiteReport): string[] {
+function renderHeader(suite: Readonly<ISuiteReport>): string[] {
 	const L: string[] = [];
 	const { config } = suite;
 
@@ -296,8 +296,8 @@ function renderHeader(suite: ISuiteReport): string[] {
 // ─── Winner announcement ─────────────────────────────────────────────────────
 
 function renderWinner(
-	fns: IFunctionStatistics[],
-	comps: IPairedComparison[],
+	fns: readonly Readonly<IFunctionStatistics>[],
+	comps: readonly Readonly<IPairedComparison>[],
 ): string[] {
 	if (fns.length < 2) return [];
 
@@ -353,7 +353,9 @@ function renderWinner(
 
 // ─── Leaderboard ─────────────────────────────────────────────────────────────
 
-function renderLeaderboard(fns: IFunctionStatistics[]): string[] {
+function renderLeaderboard(
+	fns: readonly Readonly<IFunctionStatistics>[],
+): string[] {
 	const L: string[] = [];
 	const fastest = fns[0];
 
@@ -440,7 +442,9 @@ function renderLeaderboard(fns: IFunctionStatistics[]): string[] {
 
 // ─── Distribution (box plots + sparklines) ───────────────────────────────────
 
-function renderDistribution(fns: IFunctionStatistics[]): string[] {
+function renderDistribution(
+	fns: readonly Readonly<IFunctionStatistics>[],
+): string[] {
 	const L: string[] = [];
 
 	L.push(secLine('Distribution'));
@@ -498,7 +502,9 @@ function renderDistribution(fns: IFunctionStatistics[]): string[] {
 
 // ─── Detailed statistics table ───────────────────────────────────────────────
 
-function renderDetailedStats(fns: IFunctionStatistics[]): string[] {
+function renderDetailedStats(
+	fns: readonly Readonly<IFunctionStatistics>[],
+): string[] {
 	const L: string[] = [];
 
 	L.push(secLine('Detailed Statistics'));
@@ -552,13 +558,13 @@ function renderDetailedStats(fns: IFunctionStatistics[]): string[] {
 // ─── Pairwise comparisons ────────────────────────────────────────────────────
 
 function renderComparisons(
-	fns: IFunctionStatistics[],
-	comps: IPairedComparison[],
+	fns: readonly Readonly<IFunctionStatistics>[],
+	comps: readonly Readonly<IPairedComparison>[],
 ): string[] {
 	if (comps.length === 0) return [];
 
 	const L: string[] = [];
-	const byName: Record<string, IFunctionStatistics> = {};
+	const byName: Record<string, Readonly<IFunctionStatistics>> = {};
 	for (const f of fns) byName[f.name] = f;
 
 	L.push(secLine('Pairwise Comparisons (paired t-test)'));
@@ -630,8 +636,8 @@ function renderComparisons(
 // ─── Speed matrix ────────────────────────────────────────────────────────────
 
 function renderMatrix(
-	fns: IFunctionStatistics[],
-	comps: IPairedComparison[],
+	fns: readonly Readonly<IFunctionStatistics>[],
+	comps: readonly Readonly<IPairedComparison>[],
 ): string[] {
 	// Only render for a reasonable number of functions
 	if (fns.length < 3 || fns.length > 8) return [];
@@ -713,8 +719,8 @@ function renderMatrix(
 // ─── Measurement overhead / baseline ─────────────────────────────────────────
 
 function renderBaseline(
-	baseline: IFunctionStatistics | undefined,
-	fastest: IFunctionStatistics,
+	baseline: Readonly<IFunctionStatistics> | undefined,
+	fastest: Readonly<IFunctionStatistics>,
 ): string[] {
 	if (!baseline) return [];
 
@@ -812,7 +818,7 @@ function renderFooter(): string[] {
  * | Speed matrix         | Developers (3-8 fns)  |
  * | Measurement overhead | Advanced users        |
  */
-export function formatReport(suite: ISuiteReport): string {
+export function formatReport(suite: Readonly<ISuiteReport>): string {
 	// ── Separate baseline from benchmarks, sort fastest → slowest ──────
 	const baseline = suite.functions.find((f) => f.name === suite.baselineName);
 	const fns = suite.functions
@@ -851,7 +857,10 @@ export interface IReporterOptions {
 	output?: (s: string) => void;
 }
 
-function printReport(suite: ISuiteReport, opts?: IReporterOptions): void {
+function printReport(
+	suite: Readonly<ISuiteReport>,
+	opts?: Readonly<IReporterOptions>,
+): void {
 	const out =
 		opts?.output ??
 		(console.log as Exclude<IReporterOptions['output'], undefined>);

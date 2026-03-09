@@ -21,11 +21,13 @@ import {
 } from './errors.js';
 import { generateReport } from './report.js';
 import type {
+	ContextFn,
 	IBenchmarkFn,
 	ISuiteConfig,
 	ISuiteReport,
 	ITrialMeasurement,
 	ITrialResult,
+	SuiteConfig,
 } from './types.js';
 import { IRunProgress, NULL_FUNCTION_NAME } from './types.js';
 import { shuffled } from './utils.js';
@@ -33,17 +35,25 @@ import { shuffled } from './utils.js';
 // ── Helpers ─────────────────────────────────────────────────────────────
 
 /** Invoke an optional sync-or-async callback with a `this` context. */
-async function invoke<TC extends object, TA extends unknown[] = never[]>(
-	fn: ((this: TC, ...args: TA) => unknown | PromiseLike<unknown>) | undefined,
+async function invoke<
+	TC extends object,
+	TA extends unknown[] = never[],
+	TR = unknown,
+>(
+	signal: AbortSignal | undefined,
+	fn: ((this: TC, ...args: TA) => TR | PromiseLike<TR>) | undefined,
 	ctx: TC,
-	...args: TA
+	args: (readonly never[] extends TA ? TA | undefined : TA) | undefined,
 ): Promise<void> {
+	if (signal?.aborted) {
+		throw new BenchmarkAbortedError('Aborted');
+	}
 	if (!fn) return;
-	const result = fn.apply(ctx, args);
+	const result = args ? fn.apply(ctx, args) : fn.apply(ctx);
 	if (
 		result &&
 		typeof result === 'object' &&
-		typeof (result as PromiseLike<unknown>).then === 'function'
+		typeof (result as PromiseLike<TR>).then === 'function'
 	) {
 		await result;
 	}
@@ -56,30 +66,44 @@ async function invoke<TC extends object, TA extends unknown[] = never[]>(
  * Sync functions are never unnecessarily awaited, keeping microtask
  * overhead out of the measurement loop.
  */
-async function measureTime<TC extends object>(
-	fn: (this: TC) => unknown | PromiseLike<unknown>,
+async function measureTime<
+	TC extends object,
+	TA extends unknown[] = never[],
+	TR = unknown,
+>(
+	signal: AbortSignal | undefined,
+	fn: (this: TC, ...args: TA) => TR | PromiseLike<TR>,
 	ctx: TC,
 	warmup: number,
 	iterations: number,
+	args: (readonly never[] extends TA ? TA | undefined : TA) | undefined,
 ): Promise<number> {
+	if (signal?.aborted) {
+		throw new BenchmarkAbortedError('Aborted');
+	}
+
 	for (let i = 0; i < warmup; i++) {
-		const r = fn.call(ctx);
+		const r = args ? fn.apply(ctx, args) : fn.apply(ctx);
 		if (
 			r &&
 			typeof r === 'object' &&
-			typeof (r as PromiseLike<unknown>).then === 'function'
+			typeof (r as PromiseLike<TR>).then === 'function'
 		) {
 			await r;
 		}
 	}
 
+	if (signal?.aborted) {
+		throw new BenchmarkAbortedError('Aborted');
+	}
+
 	const start = performance.now();
 	for (let i = 0; i < iterations; i++) {
-		const r = fn.call(ctx);
+		const r = args ? fn.apply(ctx, args) : fn.apply(ctx);
 		if (
 			r &&
 			typeof r === 'object' &&
-			typeof (r as PromiseLike<unknown>).then === 'function'
+			typeof (r as PromiseLike<TR>).then === 'function'
 		)
 			await r;
 	}
@@ -118,28 +142,34 @@ async function measureTime<TC extends object>(
  * Each function gets its own context; measurements within the same trial
  * are paired for downstream statistical tests.
  */
-export class Suite<TC extends object = Record<string, unknown>, TR = unknown> {
-	private readonly _name: string;
+export class Suite<
+	TC extends object = Record<string, unknown>,
+	TR = unknown,
+	TA extends unknown[] = never[],
+> {
+	private readonly _name: ISuiteConfig<TC, TA, TA>['name'];
 	private readonly _warmup: number;
 	private readonly _iterations: number;
 	private readonly _trials: number;
-	private readonly _suiteSetup?: ISuiteConfig<TC, TR>['setup'];
-	private readonly _suiteTeardown?: ISuiteConfig<TC, TR>['teardown'];
-	private readonly _suiteValidate?: ISuiteConfig<TC, TR>['validate'];
-	private readonly _fns: IBenchmarkFn<TC, TR>[] = [];
+	private readonly _args: SuiteConfig<TC, TR, TA>['args'];
+	private readonly _suiteSetup?: ISuiteConfig<TC, TR, TA>['setup'];
+	private readonly _suiteTeardown?: ISuiteConfig<TC, TR, TA>['teardown'];
+	private readonly _suiteValidate?: ISuiteConfig<TC, TR, TA>['validate'];
+	private readonly _fns: IBenchmarkFn<TC, TR, TA>[] = [];
 
-	constructor(options: ISuiteConfig<TC, TR>) {
+	constructor(options: Readonly<SuiteConfig<TC, TR, TA>>) {
 		this._name = options.name;
 		this._warmup = options.warmupIterations ?? 10;
 		this._iterations = options.iterationsPerTrial ?? 1000;
 		this._trials = options.trials ?? 30;
+		this._args = options.args;
 		this._suiteSetup = options.setup;
 		this._suiteTeardown = options.teardown;
 		this._suiteValidate = options.validate;
 	}
 
 	/** Register a benchmark function.  Returns `this` for chaining. */
-	add(fn: IBenchmarkFn<TC, TR>): this {
+	add(fn: IBenchmarkFn<TC, TR, TA>): this {
 		if (this._fns.some((f) => f.name === fn.name)) {
 			throw new BenchmarkDuplicateNameError(
 				`Duplicate benchmark name: "${fn.name}"`,
@@ -163,11 +193,25 @@ export class Suite<TC extends object = Record<string, unknown>, TR = unknown> {
 		const eventTarget = opts?.eventTarget;
 		const signal = opts?.signal;
 
+		for (const bench of this._fns.filter(
+			(fn) => fn.name !== NULL_FUNCTION_NAME,
+		)) {
+			const validateCtx = Object.create(null) as TC;
+
+			const args = [bench.fn, ...(this._args ? this._args : [])] as [
+				ContextFn<TC, TR, TA>,
+				...Exclude<ISuiteConfig<TC, TR, TA>['args'], undefined>,
+			];
+
+			await invoke(signal, this._suiteValidate, validateCtx, args);
+			await invoke(signal, bench.validate, validateCtx, args);
+		}
+
 		// Inject the null baseline — an empty function that captures the
 		// overhead of the measurement loop (call dispatch, thenable check,
 		// loop counter).  It participates in shuffling like every other
 		// function so it experiences the same ordering / cache conditions.
-		const nullFn: IBenchmarkFn<TC> = {
+		const nullFn: IBenchmarkFn<TC, void, TA> = {
 			name: NULL_FUNCTION_NAME,
 			fn() {},
 		};
@@ -184,9 +228,6 @@ export class Suite<TC extends object = Record<string, unknown>, TR = unknown> {
 
 			for (const bench of order) {
 				try {
-					if (signal?.aborted) {
-						throw new BenchmarkAbortedError('Aborted');
-					}
 					if (eventTarget) {
 						eventTarget.dispatchEvent(
 							new CustomEvent<IRunProgress>('progress', {
@@ -201,36 +242,21 @@ export class Suite<TC extends object = Record<string, unknown>, TR = unknown> {
 						await new Promise((resolve) => setTimeout(resolve, 0));
 					}
 
-					if (
-						bench.name !== NULL_FUNCTION_NAME &&
-						(this._suiteValidate || bench.setup)
-					) {
-						const validateCtx = {} as TC;
-						await invoke(
-							this._suiteValidate,
-							validateCtx,
-							bench.fn as IBenchmarkFn<TC, TR>['fn'],
-						);
-						await invoke(
-							bench.validate,
-							validateCtx,
-							bench.fn as IBenchmarkFn<TC, TR>['fn'],
-						);
-					}
-
-					const ctx = {} as TC;
-					await invoke(this._suiteSetup, ctx);
-					await invoke(bench.setup, ctx);
+					const ctx = Object.create(null) as TC;
+					await invoke(signal, this._suiteSetup, ctx, this._args);
+					await invoke(signal, bench.setup, ctx, this._args);
 
 					const totalMs = await measureTime(
-						bench.fn,
+						signal,
+						bench.fn as IBenchmarkFn<TC, unknown, TA>['fn'],
 						ctx,
 						this._warmup,
 						this._iterations,
+						this._args,
 					);
 
-					await invoke(bench.teardown, ctx);
-					await invoke(this._suiteTeardown, ctx);
+					await invoke(signal, bench.teardown, ctx, this._args);
+					await invoke(signal, this._suiteTeardown, ctx, this._args);
 
 					executionOrder.push(bench.name);
 					measurements[bench.name] = {
@@ -275,15 +301,22 @@ export class Suite<TC extends object = Record<string, unknown>, TR = unknown> {
 export async function runSuite<
 	TC extends object = Record<string, unknown>,
 	TR = unknown,
+	TA extends unknown[] = never[],
 >(
-	config: ISuiteConfig<TC, TR> & {
-		functions: IBenchmarkFn<TC, TR>[];
-		eventTarget?: EventTarget;
-		signal?: AbortSignal;
-	},
+	config: Readonly<
+		SuiteConfig<TC, TR, TA> & {
+			functions: IBenchmarkFn<TC, TR, TA>[];
+			eventTarget?: EventTarget;
+			signal?: AbortSignal;
+		}
+	>,
 ): Promise<ISuiteReport> {
 	const { functions, eventTarget, signal, ...suiteConfig } = config;
-	const suite = new Suite<TC, TR>(suiteConfig);
-	for (const fn of functions) suite.add(fn);
+	const suite = new Suite<TC, TR, TA>(
+		suiteConfig as Readonly<SuiteConfig<TC, TR, TA>>,
+	);
+	for (const fn of functions) {
+		suite.add(fn);
+	}
 	return suite.run({ eventTarget, signal });
 }
